@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Function Key Detector</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: sans-serif; background: #f5f5f2; color: #1a1a1a; padding: 2rem; }
+  h1 { font-size: 18px; font-weight: 500; margin-bottom: 1rem; }
+  .info-bar { font-size: 13px; color: #666; padding: 0.75rem 1rem; background: #ebebeb; border-radius: 8px; border: 0.5px solid #ddd; margin-bottom: 0.75rem; }
+  .info-bar span { color: #1a1a1a; font-weight: 500; }
+  .badge-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 0.75rem; min-height: 28px; align-items: center; }
+  .badge { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 8px; background: #EEEDFE; color: #3C3489; border: 0.5px solid #AFA9EC; }
+  .kbd-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1rem; }
+  .fkey { background: #ebebeb; border: 0.5px solid #ddd; border-radius: 8px; padding: 14px 8px; text-align: center; transition: background 0.12s, border-color 0.12s, transform 0.08s; cursor: default; user-select: none; }
+  .fkey .label { font-size: 13px; font-weight: 500; color: #555; letter-spacing: 0.04em; }
+  .fkey .status { font-size: 11px; color: #999; margin-top: 4px; }
+  .fkey.active { background: #E1F5EE; border-color: #0F6E56; transform: scale(0.96); }
+  .fkey.active .label { color: #085041; }
+  .fkey.active .status { color: #0F6E56; }
+  .fkey.pressed { background: #EEEDFE; border-color: #534AB7; transform: scale(0.93); }
+  .fkey.pressed .label { color: #3C3489; }
+  .fkey.pressed .status { color: #534AB7; }
+  .log { font-size: 12px; color: #555; padding: 0.5rem 0.75rem; background: #ebebeb; border-radius: 8px; border: 0.5px solid #ddd; height: 80px; overflow-y: auto; font-family: monospace; }
+  .log-entry { margin: 1px 0; }
+  .log-entry.down { color: #0F6E56; }
+  .log-entry.up { color: #534AB7; }
+  .placeholder { font-size: 11px; color: #aaa; }
+</style>
+</head>
+<body>
+
+<h1>Function Key Detector</h1>
+
+<div class="info-bar">Hold any F key — <span id="count">0</span> currently active</div>
+
+<div class="badge-row" id="badge-row">
+  <span class="placeholder">No keys held</span>
+</div>
+
+<div class="kbd-grid" id="kbd-grid"></div>
+
+<div class="log" id="log">
+  <div class="placeholder">Key events appear here...</div>
+</div>
+
+<script>
+  const grid = document.getElementById('kbd-grid');
+  const logEl = document.getElementById('log');
+  const countEl = document.getElementById('count');
+  const badgeRow = document.getElementById('badge-row');
+  const keys = {};
+  const fkeys = Array.from({ length: 12 }, (_, i) => `F${i + 1}`);
+
+  fkeys.forEach(k => {
+    const div = document.createElement('div');
+    div.className = 'fkey';
+    div.id = 'key-' + k;
+    div.innerHTML = `<div class="label">${k}</div><div class="status" id="st-${k}">—</div>`;
+    grid.appendChild(div);
+  });
+
+  function updateBadges() {
+    const active = fkeys.filter(k => keys[k]);
+    if (active.length === 0) {
+      badgeRow.innerHTML = '<span class="placeholder">No keys held</span>';
+    } else {
+      badgeRow.innerHTML = active.map(k => `<span class="badge">${k}</span>`).join('');
+    }
+    countEl.textContent = active.length;
+  }
+
+  function addLog(msg, type) {
+    const placeholder = logEl.querySelector('.placeholder');
+    if (placeholder) logEl.innerHTML = '';
+    const d = document.createElement('div');
+    d.className = 'log-entry ' + type;
+    d.textContent = msg;
+    logEl.insertBefore(d, logEl.firstChild);
+    if (logEl.children.length > 30) logEl.removeChild(logEl.lastChild);
+  }
+
+  function ts() {
+    const n = new Date();
+    return `${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}:${String(n.getSeconds()).padStart(2,'0')}.${String(n.getMilliseconds()).padStart(3,'0')}`;
+  }
+
+  document.addEventListener('keydown', e => {
+    const k = e.key;
+    if (!fkeys.includes(k)) return;
+    e.preventDefault();
+    if (keys[k]) return;
+    keys[k] = true;
+    const el = document.getElementById('key-' + k);
+    if (el) { el.classList.add('active', 'pressed'); document.getElementById('st-' + k).textContent = 'held'; }
+    setTimeout(() => { if (el) el.classList.remove('pressed'); }, 80);
+    addLog(`↓ ${k} down  ${ts()}`, 'down');
+    updateBadges();
+  });
+
+  document.addEventListener('keyup', e => {
+    const k = e.key;
+    if (!fkeys.includes(k)) return;
+    e.preventDefault();
+    keys[k] = false;
+    const el = document.getElementById('key-' + k);
+    if (el) { el.classList.remove('active', 'pressed'); document.getElementById('st-' + k).textContent = '—'; }
+    addLog(`↑ ${k} up    ${ts()}`, 'up');
+    updateBadges();
+  });
+
+  window.addEventListener('blur', () => {
+    fkeys.forEach(k => {
+      if (keys[k]) {
+        keys[k] = false;
+        const el = document.getElementById('key-' + k);
+        if (el) { el.classList.remove('active', 'pressed'); document.getElementById('st-' + k).textContent = '—'; }
+      }
+    });
+    updateBadges();
+  });
+</script>
+
+</body>
+</html>
